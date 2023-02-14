@@ -1,5 +1,6 @@
 #include "CGameInstance.h"
 #include "Engine/Engine.h"
+#include "Widgets/CMainMenu.h"
 #include "Blueprint/UserWidget.h"
 
 UCGameInstance::UCGameInstance(const FObjectInitializer& ObjectInitializer)
@@ -20,27 +21,19 @@ void UCGameInstance::LoadMainMenu()
 {
 	if (MainMenuClass == nullptr) return;
 	
-	UUserWidget* mainMenu = CreateWidget<UUserWidget>(this, MainMenuClass);
-	if (mainMenu == nullptr) return;
-	mainMenu->AddToViewport();
+	MainMenu = CreateWidget<UCMainMenu>(this, MainMenuClass);
+	if (MainMenu == nullptr) return;
 
-	APlayerController* controller = GetFirstLocalPlayerController();
-	if (controller == nullptr) return;
-
-	// Input 옵션 설정
-	FInputModeUIOnly inputMode;
-	mainMenu->bIsFocusable = true;
-	inputMode.SetWidgetToFocus(mainMenu->TakeWidget());
-	inputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);	// 마우스가 게임화면을 벗어나도 되는지 안되는지
-
-
-	controller->SetInputMode(inputMode);
-	controller->bShowMouseCursor = true;
+	MainMenu->Setup();
+	MainMenu->SetMenuInterface(this);	// 나 자신을 넘겨주기
 
 }
 
 void UCGameInstance::Host()
 {
+	if(!!MainMenu)
+		MainMenu->Teardown();
+
 	UEngine* engine = GetEngine();
 	if (engine == nullptr) return;
 
