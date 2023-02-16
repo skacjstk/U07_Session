@@ -1,8 +1,7 @@
 #include "CGameInstance.h"
 #include "Engine/Engine.h"
-#include "Widgets/CMainMenu.h"
-#include "Widgets/CInGameMenu.h"
 #include "Blueprint/UserWidget.h"
+#include "Widgets/CMainMenu.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
 
@@ -37,7 +36,7 @@ void UCGameInstance::Init()
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("Oss Not Found"));
+		UE_LOG(LogTemp, Error, TEXT("OSS Not Found"));
 	}
 }
 
@@ -91,6 +90,10 @@ void UCGameInstance::CreateSession()
 
 void UCGameInstance::Join(const FString& InAddress)
 {
+	// UI 인풋모드 세팅을 돌려놓기
+	if (!!MainMenu)
+		MainMenu->Teardown();
+
 	UEngine* engine = GetEngine();
 	if (engine == nullptr) return;
 	engine->AddOnScreenDebugMessage(0, 2, FColor::Green, FString::Printf(TEXT("Join to %s"), *InAddress));
@@ -98,9 +101,6 @@ void UCGameInstance::Join(const FString& InAddress)
 	APlayerController* controller = GetFirstLocalPlayerController();	// 서버,클라 에서, 내가 직접 조종하는 컨트롤러 가져오는 거
 	if (controller == nullptr) return;
 
-	// UI 인풋모드 세팅을 돌려놓기
-	if(!!MainMenu)
-		MainMenu->Teardown();
 
 	controller->ClientTravel(InAddress, ETravelType::TRAVEL_Absolute);
 	// IP 주소는 거의 절대적 = absolute, SteamOSS도 가상 공인IP 주는 거
@@ -118,11 +118,12 @@ void UCGameInstance::OnCreateSessionComplete(FName InSessionName, bool InSuccess
 {
 	if (InSuccess == false)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Could Not Create Session"));
+		UE_LOG(LogTemp, Error, TEXT("Could Not Create Session!!"));
 		return;
 	}
 
-	UE_LOG(LogTemp, Error, TEXT("SessionName: %s"),*InSessionName.ToString());
+	UE_LOG(LogTemp, Error, TEXT("SessionName : %s"), *InSessionName.ToString());
+
 	if (!!MainMenu)
 		MainMenu->Teardown();
 
