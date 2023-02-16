@@ -14,7 +14,8 @@ public class Game : ModuleRules
 			"Engine", 
 			"InputCore", 
 			"HeadMountedDisplay", 
-			"UMG"
+			"UMG",
+			"OnlineSubsystem"
 		});
 	}
 }
