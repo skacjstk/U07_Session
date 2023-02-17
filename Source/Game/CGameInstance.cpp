@@ -32,6 +32,10 @@ void UCGameInstance::Init()
 		{
 			SessionInterface->OnCreateSessionCompleteDelegates.AddUObject(this, &UCGameInstance::OnCreateSessionComplete);
 			SessionInterface->OnDestroySessionCompleteDelegates.AddUObject(this, &UCGameInstance::OnDestroySessionComplete);
+			// 찾기 관련
+			SessionInterface->OnFindSessionsCompleteDelegates.AddUObject(this, &UCGameInstance::OnFindSessionsComplete);
+			
+
 		}
 	}
 	else
@@ -83,6 +87,9 @@ void UCGameInstance::CreateSession()
 	if (SessionInterface.IsValid())
 	{
 		FOnlineSessionSettings sessionSettings;
+		sessionSettings.bIsLANMatch = true;
+		sessionSettings.NumPublicConnections = 2;
+		sessionSettings.bShouldAdvertise = true;
 		SessionInterface->CreateSession(0, SESSION_NAME, sessionSettings);
 		// 방장번호, 
 	}
@@ -90,6 +97,7 @@ void UCGameInstance::CreateSession()
 
 void UCGameInstance::Join(const FString& InAddress)
 {
+	/*
 	// UI 인풋모드 세팅을 돌려놓기
 	if (!!MainMenu)
 		MainMenu->Teardown();
@@ -104,6 +112,10 @@ void UCGameInstance::Join(const FString& InAddress)
 
 	controller->ClientTravel(InAddress, ETravelType::TRAVEL_Absolute);
 	// IP 주소는 거의 절대적 = absolute, SteamOSS도 가상 공인IP 주는 거
+
+	*/
+	if(!!MainMenu)
+		MainMenu->SetServerList({"Session1", "Session2"});
 }
 
 void UCGameInstance::LoadMainMenuLevel()
@@ -114,8 +126,20 @@ void UCGameInstance::LoadMainMenuLevel()
 	controller->ClientTravel("/Game/Maps/MainMenu", ETravelType::TRAVEL_Absolute);
 }
 
+void UCGameInstance::RefreshServerList()
+{
+	SessionSearch = MakeShareable(new FOnlineSessionSearch());
+	if (SessionSearch.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Start Find Sessions"));
+		SessionSearch->bIsLanQuery = true;
+		SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());	// 세션을 검색하라는 명령
+	}
+}
+
 void UCGameInstance::OnCreateSessionComplete(FName InSessionName, bool InSuccess)
 {
+//	UE_LOG(LogTemp, Warning, TEXT("Create Session"));
 	if (InSuccess == false)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Could Not Create Session!!"));
@@ -138,6 +162,24 @@ void UCGameInstance::OnCreateSessionComplete(FName InSessionName, bool InSuccess
 
 void UCGameInstance::OnDestroySessionComplete(FName InSessionName, bool InSuccess)
 {
+//	UE_LOG(LogTemp, Warning, TEXT("Destroied Session"));
 	if (InSuccess == true)
 		CreateSession();
+}
+void UCGameInstance::OnFindSessionsComplete(bool InSuccess)
+{
+	if (InSuccess == true && SessionSearch.IsValid() && MainMenu != nullptr)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Finished Find Sessions"));
+
+		TArray<FString> serverNames;
+
+		for (FOnlineSessionSearchResult& searchResult : SessionSearch->SearchResults)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Session Id: %s"), *searchResult.GetSessionIdStr());
+			UE_LOG(LogTemp, Warning, TEXT("Ping : %d"), searchResult.PingInMs);
+			serverNames.Add(searchResult.GetSessionIdStr());
+		}
+		MainMenu->SetServerList(serverNames);	// 검색 완료된 세션 ID들을 넘겨주기
+	}
 }

@@ -1,9 +1,8 @@
 #pragma once
-
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "Widgets/IMenuInterface.h"
-#include "OnlineSubSystem.h"
+#include "OnlineSubsystem.h"
 #include "CGameInstance.generated.h"
 
 UCLASS()
@@ -15,23 +14,30 @@ public:
 	virtual void Init() override;
 	UFUNCTION(BlueprintCallable, Exec)
 		void LoadMainMenu();
-	UFUNCTION(BlueprintCallable, Exec)	// 콘솔 명령어 exec
+	UFUNCTION(BlueprintCallable, Exec)
 		void LoadInGameMenu();
+
 	UFUNCTION(Exec)
 		void Host() override;
-
 	UFUNCTION(Exec)
 		void Join(const FString& InAddress) override;
 
 	void LoadMainMenuLevel() override;
+
+	void RefreshServerList() override;	// 서버 재검색
 private:
 	void OnCreateSessionComplete(FName InSessionName, bool InSuccess);
 	void OnDestroySessionComplete(FName InSessionName, bool InSuccess);
+	void OnFindSessionsComplete(bool InSuccess);
 	void CreateSession();
+
 private:
 	TSubclassOf<class UUserWidget> MainMenuClass;
 	TSubclassOf<class UUserWidget> InGameMenuClass;
+
 	class UCMainMenu* MainMenu;
-	class UCInGameMenu* InGameMenu;
+
 	IOnlineSessionPtr SessionInterface;
+
+	TSharedPtr<class FOnlineSessionSearch> SessionSearch;
 };

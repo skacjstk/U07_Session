@@ -1,7 +1,17 @@
 #include "CMainMenu.h"
+#include "CServerRow.h"
+#include "Components/TextBlock.h"
 #include "Components/Button.h"
 #include "Components/WidgetSwitcher.h"
 #include "Components/EditableTextBox.h"
+
+UCMainMenu::UCMainMenu(const FObjectInitializer& ObjectInitializer)
+{
+	// ServerRow클래스Ref 가져오기
+	ConstructorHelpers::FClassFinder<UUserWidget> serverRowClass(TEXT("/Game/Widgets/WB_ServerRow"));
+	if (serverRowClass.Succeeded())
+		ServerRowClass = serverRowClass.Class;
+}
 
 bool UCMainMenu::Initialize()
 {
@@ -30,22 +40,58 @@ void UCMainMenu::HostServer()
 	if(!!MenuInterface)
 	MenuInterface->Host();
 }
-void UCMainMenu::JoinServer()
+
+void UCMainMenu::SetServerList(TArray<FString> InServerNames)
 {
-	if (!!MenuInterface)
+	ServerList->ClearChildren();
+	// ServerRow 만들기
+	uint32 i = 0;
+	for (const FString& serverName : InServerNames)
 	{
-		//IPAddressField->글자 콘탠츠 읽어 넘겨주기
-		if (IPAddressField == nullptr) return;
-		const FString& address = IPAddressField->GetText().ToString();
-		MenuInterface->Join(address);
+		UCServerRow* row = CreateWidget<UCServerRow>(this, ServerRowClass);
+		if (row == nullptr) return;
+		row->ServerName->SetText(FText::FromString(serverName));
+		row->Setup(this, i++);
+		ServerList->AddChild(row);
 	}
+
 }
 
-void UCMainMenu::OpenJoinMenu()
+void UCMainMenu::SetSelectedIndex(uint32 Index)
+{
+	SelectedIndex = Index;
+}
+
+void UCMainMenu::JoinServer()
+{	
+	if (SelectedIndex.IsSet())
+	{
+		UE_LOG(LogTemp, Display, TEXT("Selected Index: %d"), SelectedIndex.GetValue());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Display, TEXT("Selected Index Not Set"));
+	}
+	if (!!MenuInterface)
+	{
+	//	//IPAddressField->글자 콘탠츠 읽어 넘겨주기
+	//	if (IPAddressField == nullptr) return;
+	//	const FString& address = IPAddressField->GetText().ToString();
+		MenuInterface->Join("");
+
+	}	
+}
+
+void UCMainMenu::OpenJoinMenu()	// 메인메뉴에서 Join 버튼 눌렀을 때
 {
 	if (MenuSwitcher == nullptr) return;
 	if (JoinMenu == nullptr) return;
 	MenuSwitcher->SetActiveWidget(JoinMenu);
+
+	if (MenuInterface != nullptr)	// 세션 검색 시작 
+	{
+		MenuInterface->RefreshServerList();
+	}
 }
 
 void UCMainMenu::OpenMainMenu()
