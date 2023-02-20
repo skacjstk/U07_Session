@@ -15,7 +15,8 @@ public class Game : ModuleRules
 			"InputCore", 
 			"HeadMountedDisplay", 
 			"UMG",
-			"OnlineSubsystem"
+			"OnlineSubsystem",
+			"OnlineSubsystemSteam"
 		});
 	}
 }

@@ -41,16 +41,20 @@ void UCMainMenu::HostServer()
 	MenuInterface->Host();
 }
 
-void UCMainMenu::SetServerList(TArray<FString> InServerNames)
+void UCMainMenu::SetServerList(TArray<FServerData> InServerDatas)
 {
 	ServerList->ClearChildren();
 	// ServerRow 만들기
 	uint32 i = 0;
-	for (const FString& serverName : InServerNames)
+	for (const FServerData& serverData : InServerDatas)
 	{
 		UCServerRow* row = CreateWidget<UCServerRow>(this, ServerRowClass);
 		if (row == nullptr) return;
-		row->ServerName->SetText(FText::FromString(serverName));
+
+		row->ServerName->SetText(FText::FromString(serverData.HostUserName));
+		row->HostUser->SetText(FText::FromString(serverData.HostUserName));
+		FString fractionText = FString::Printf(TEXT("%d/%d"), serverData.CurrentPlayers, serverData.MaxPlayers);
+		row->ConnectionFraction->SetText(FText::FromString(fractionText));
 		row->Setup(this, i++);
 		ServerList->AddChild(row);
 	}
@@ -60,26 +64,24 @@ void UCMainMenu::SetServerList(TArray<FString> InServerNames)
 void UCMainMenu::SetSelectedIndex(uint32 Index)
 {
 	SelectedIndex = Index;
+	UpdateChildren();
 }
 
 void UCMainMenu::JoinServer()
 {	
-	if (SelectedIndex.IsSet())
+	if (SelectedIndex.IsSet() && !!MenuInterface)
 	{
 		UE_LOG(LogTemp, Display, TEXT("Selected Index: %d"), SelectedIndex.GetValue());
+		MenuInterface->Join(SelectedIndex.GetValue());	// 선택한 Index를 int형으로 넘겨주기
 	}
 	else
 	{
 		UE_LOG(LogTemp, Display, TEXT("Selected Index Not Set"));
 	}
-	if (!!MenuInterface)
-	{
 	//	//IPAddressField->글자 콘탠츠 읽어 넘겨주기
 	//	if (IPAddressField == nullptr) return;
 	//	const FString& address = IPAddressField->GetText().ToString();
-		MenuInterface->Join("");
-
-	}	
+	
 }
 
 void UCMainMenu::OpenJoinMenu()	// 메인메뉴에서 Join 버튼 눌렀을 때
@@ -99,6 +101,19 @@ void UCMainMenu::OpenMainMenu()
 	if (MenuSwitcher == nullptr) return;
 	if (MainMenu == nullptr) return;
 	MenuSwitcher->SetActiveWidget(MainMenu);
+}
+
+void UCMainMenu::UpdateChildren()
+{	
+	// OnClicked를 이용하는게 맞음. 근데 핵심은 Session 이니 넘어가자구
+	for (int32 i = 0; i < ServerList->GetChildrenCount(); ++i)
+	{
+		UCServerRow* serverRow = Cast<UCServerRow>(ServerList->GetChildAt(i));
+		if (!!serverRow)
+		{
+			serverRow->bSelected = (SelectedIndex.IsSet()) && (SelectedIndex.GetValue() == i);
+		}
+	}
 }
 
 void UCMainMenu::QuitPressed()

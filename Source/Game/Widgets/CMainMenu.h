@@ -4,6 +4,17 @@
 #include "CMenuWidget.h"
 #include "CMainMenu.generated.h"
 
+USTRUCT(BlueprintType)
+struct FServerData
+{
+	GENERATED_BODY()
+public:
+	FString Name;	// 드러운 Session ID
+	uint16 CurrentPlayers;
+	uint16 MaxPlayers;
+	FString HostUserName;	// 방장의 컴퓨터 이름
+
+};
 UCLASS()
 class GAME_API UCMainMenu : public UCMenuWidget
 {
@@ -12,7 +23,7 @@ public:
 	UCMainMenu(const FObjectInitializer& ObjectInitializer);	// 생성자
 
 	virtual bool Initialize() override;
-	void SetServerList(TArray<FString> InServerNames);
+	void SetServerList(TArray<FServerData> InServerDatas);
 	void SetSelectedIndex(uint32 Index);
 private:
 	UFUNCTION()
@@ -25,6 +36,8 @@ private:
 		void OpenJoinMenu();
 	UFUNCTION()
 		void OpenMainMenu();
+private:
+	void UpdateChildren();	// 직전에 누른 버튼 강조
 
 private:
 	UPROPERTY(meta = (BindWidget))

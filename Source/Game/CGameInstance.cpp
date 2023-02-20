@@ -2,7 +2,6 @@
 #include "Engine/Engine.h"
 #include "Blueprint/UserWidget.h"
 #include "Widgets/CMainMenu.h"
-#include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
 
 const static FName SESSION_NAME = TEXT("GameSession");	// 북미서버, 아시아서버 같은거라 보면 된다.
@@ -33,9 +32,9 @@ void UCGameInstance::Init()
 			SessionInterface->OnCreateSessionCompleteDelegates.AddUObject(this, &UCGameInstance::OnCreateSessionComplete);
 			SessionInterface->OnDestroySessionCompleteDelegates.AddUObject(this, &UCGameInstance::OnDestroySessionComplete);
 			// 찾기 관련
-			SessionInterface->OnFindSessionsCompleteDelegates.AddUObject(this, &UCGameInstance::OnFindSessionsComplete);
-			
-
+			SessionInterface->OnFindSessionsCompleteDelegates.AddUObject(this, &UCGameInstance::OnFindSessionsComplete);			
+			//세선 접속 성공 바인딩
+			SessionInterface->OnJoinSessionCompleteDelegates.AddUObject(this, &UCGameInstance::OnJoinSessionComplete);
 		}
 	}
 	else
@@ -87,35 +86,32 @@ void UCGameInstance::CreateSession()
 	if (SessionInterface.IsValid())
 	{
 		FOnlineSessionSettings sessionSettings;
-		sessionSettings.bIsLANMatch = true;
-		sessionSettings.NumPublicConnections = 2;
-		sessionSettings.bShouldAdvertise = true;
+
+		if (IOnlineSubsystem::Get()->GetSubsystemName() == "NULL")
+		{
+			sessionSettings.bIsLANMatch = true;
+		}
+		else
+		{
+			sessionSettings.bIsLANMatch = false;
+		}
+
+		sessionSettings.NumPublicConnections = 2;	// 인원수 제한
+		sessionSettings.bShouldAdvertise = true;	
+		sessionSettings.bUsesPresence = true;	// STEAM OSS 이후 사용: LobbySession을 가져오기 위해
 		SessionInterface->CreateSession(0, SESSION_NAME, sessionSettings);
 		// 방장번호, 
 	}
 }
 
-void UCGameInstance::Join(const FString& InAddress)
+void UCGameInstance::Join(uint32 Index)
 {
-	/*
-	// UI 인풋모드 세팅을 돌려놓기
+	if (SessionInterface.IsValid() == false) return;
+	if (SessionSearch.IsValid() == false) return;
+
 	if (!!MainMenu)
 		MainMenu->Teardown();
-
-	UEngine* engine = GetEngine();
-	if (engine == nullptr) return;
-	engine->AddOnScreenDebugMessage(0, 2, FColor::Green, FString::Printf(TEXT("Join to %s"), *InAddress));
-
-	APlayerController* controller = GetFirstLocalPlayerController();	// 서버,클라 에서, 내가 직접 조종하는 컨트롤러 가져오는 거
-	if (controller == nullptr) return;
-
-
-	controller->ClientTravel(InAddress, ETravelType::TRAVEL_Absolute);
-	// IP 주소는 거의 절대적 = absolute, SteamOSS도 가상 공인IP 주는 거
-
-	*/
-	if(!!MainMenu)
-		MainMenu->SetServerList({"Session1", "Session2"});
+	SessionInterface->JoinSession(0, SESSION_NAME, SessionSearch->SearchResults[Index]);
 }
 
 void UCGameInstance::LoadMainMenuLevel()
@@ -132,14 +128,16 @@ void UCGameInstance::RefreshServerList()
 	if (SessionSearch.IsValid())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Start Find Sessions"));
-		SessionSearch->bIsLanQuery = true;
-		SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());	// 세션을 검색하라는 명령
+		SessionSearch->MaxSearchResults = 100;
+		SessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
+//		SessionSearch->bIsLanQuery = true;
+		SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());	// 세션을 검색하라는 명령 및 결과를 SessionSearch에 저장
 	}
 }
 
 void UCGameInstance::OnCreateSessionComplete(FName InSessionName, bool InSuccess)
 {
-//	UE_LOG(LogTemp, Warning, TEXT("Create Session"));
+	//	UE_LOG(LogTemp, Warning, TEXT("Create Session"));
 	if (InSuccess == false)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Could Not Create Session!!"));
@@ -162,7 +160,7 @@ void UCGameInstance::OnCreateSessionComplete(FName InSessionName, bool InSuccess
 
 void UCGameInstance::OnDestroySessionComplete(FName InSessionName, bool InSuccess)
 {
-//	UE_LOG(LogTemp, Warning, TEXT("Destroied Session"));
+	//	UE_LOG(LogTemp, Warning, TEXT("Destroied Session"));
 	if (InSuccess == true)
 		CreateSession();
 }
@@ -172,14 +170,41 @@ void UCGameInstance::OnFindSessionsComplete(bool InSuccess)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Finished Find Sessions"));
 
-		TArray<FString> serverNames;
+		TArray<FServerData> serverDatas;
 
 		for (FOnlineSessionSearchResult& searchResult : SessionSearch->SearchResults)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Session Id: %s"), *searchResult.GetSessionIdStr());
 			UE_LOG(LogTemp, Warning, TEXT("Ping : %d"), searchResult.PingInMs);
-			serverNames.Add(searchResult.GetSessionIdStr());
+			FServerData data;
+			data.Name = searchResult.GetSessionIdStr();
+			data.MaxPlayers = searchResult.Session.SessionSettings.NumPublicConnections;
+			data.CurrentPlayers = data.MaxPlayers - searchResult.Session.NumOpenPublicConnections;	// 최대 유저수 - 비어있는 슬롯 수
+			data.HostUserName = searchResult.Session.OwningUserName;	// 소유자의 PC 이름
+			serverDatas.Add(data);
 		}
-		MainMenu->SetServerList(serverNames);	// 검색 완료된 세션 ID들을 넘겨주기
+		MainMenu->SetServerList(serverDatas);	// 검색 완료된 세션 ID들을 넘겨주기
 	}
+}
+
+void UCGameInstance::OnJoinSessionComplete(FName InSessionName, EOnJoinSessionCompleteResult::Type InResult)
+{
+	if (SessionInterface.IsValid() == false) return;
+
+	UEngine* engine = GetEngine();
+	if (engine == nullptr) return;
+
+	FString address;	//포트번호는 따로 받아야
+	if (SessionInterface->GetResolvedConnectString(InSessionName, address) == false)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Could not get IP Address"));
+		return;
+	}
+	engine->AddOnScreenDebugMessage(0, 2, FColor::Green, FString::Printf(TEXT("Join to %s"), *address));
+
+	APlayerController* controller = GetFirstLocalPlayerController();	// 서버,클라 에서, 내가 직접 조종하는 컨트롤러 가져오는 거
+	if (controller == nullptr) return;
+
+	controller->ClientTravel(address, ETravelType::TRAVEL_Absolute);
+	// IP 주소는 거의 절대적 = absolute, SteamOSS도 가상 공인IP 주는 거
 }
