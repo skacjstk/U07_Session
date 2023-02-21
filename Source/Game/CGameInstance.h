@@ -19,13 +19,14 @@ public:
 		void LoadInGameMenu();
 
 	UFUNCTION(Exec)
-		void Host() override;
+		void Host(FString InServerName) override;
 	UFUNCTION(Exec)
 		void Join(uint32 Index) override;
 
 	void LoadMainMenuLevel() override;
 
 	void RefreshServerList() override;	// 서버 재검색
+	void StartSession();
 private:
 	void OnCreateSessionComplete(FName InSessionName, bool InSuccess);
 	void OnDestroySessionComplete(FName InSessionName, bool InSuccess);
@@ -33,6 +34,8 @@ private:
 	void OnJoinSessionComplete(FName InSessionName, EOnJoinSessionCompleteResult::Type InResult);
 	void CreateSession();
 
+	// 이벤트
+	void OnNetworkFailure(UWorld* InWorld, UNetDriver* InNewDriver, ENetworkFailure::Type InType, const FString& ErrorString);
 private:
 	TSubclassOf<class UUserWidget> MainMenuClass;
 	TSubclassOf<class UUserWidget> InGameMenuClass;
@@ -42,4 +45,6 @@ private:
 	IOnlineSessionPtr SessionInterface;
 
 	TSharedPtr<class FOnlineSessionSearch> SessionSearch;
+
+	FString DesiredServerName;
 };

@@ -36,6 +36,8 @@ private:
 		void OpenJoinMenu();
 	UFUNCTION()
 		void OpenMainMenu();
+	UFUNCTION()
+		void OpenHostMenu();
 private:
 	void UpdateChildren();	// 직전에 누른 버튼 강조
 
@@ -61,6 +63,16 @@ private:
 	// 레벨 BP에 BeginPlay 에서 MainMenu 를 실행하기에, BeginPlay에서 바인딩 해야한다. 
 	UPROPERTY(meta = (BindWidget))
 		class UPanelWidget* ServerList;	// 주소 입력창
+
+	//Switcher 2번
+	UPROPERTY(meta = (BindWidget))
+		class UWidget* HostMenu;	// 2번
+	UPROPERTY(meta = (BindWidget))
+		class UEditableTextBox* ServerHostName;
+	UPROPERTY(meta = (BindWidget))
+		class UButton* CancelHostMenuButton;
+	UPROPERTY(meta = (BindWidget))
+		class UButton* ConfirmHostMenuButton;
 
 private: // 서버 리스트
 	TSubclassOf<class UUserWidget> ServerRowClass;

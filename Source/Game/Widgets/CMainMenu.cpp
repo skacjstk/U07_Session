@@ -19,7 +19,7 @@ bool UCMainMenu::Initialize()
 	if (success == false)
 		return false;
 	if(HostButton == nullptr)	return false;
-	HostButton->OnClicked.AddDynamic(this, &UCMainMenu::HostServer);
+	HostButton->OnClicked.AddDynamic(this, &UCMainMenu::OpenHostMenu);
 
 	if (JoinButton == nullptr)	return false;	// UI 널체크
 	JoinButton->OnClicked.AddDynamic(this, &UCMainMenu::OpenJoinMenu);
@@ -27,18 +27,30 @@ bool UCMainMenu::Initialize()
 	if (QuitButton == nullptr)	return false;
 	QuitButton->OnClicked.AddDynamic(this, &UCMainMenu::QuitPressed);
 
+	// Switcher 1번
 	if (CancelJoinMenuButton == nullptr) return false;
 	CancelJoinMenuButton->OnClicked.AddDynamic(this, &UCMainMenu::OpenMainMenu);
 
 	if (ComfirmJoinMenuButton == nullptr) return false;
 	ComfirmJoinMenuButton->OnClicked.AddDynamic(this, &UCMainMenu::JoinServer);
+
+	// Switcher 2번
+	if (CancelHostMenuButton == nullptr) return false;
+	CancelHostMenuButton->OnClicked.AddDynamic(this, &UCMainMenu::OpenMainMenu);
+
+	if (ConfirmHostMenuButton == nullptr) return false;
+	ConfirmHostMenuButton->OnClicked.AddDynamic(this, &UCMainMenu::HostServer);
+
 	return true;
 }
 
 void UCMainMenu::HostServer()
 {
-	if(!!MenuInterface)
-	MenuInterface->Host();
+	if (!!MenuInterface)
+	{		
+		FString serverName = ServerHostName->Text.ToString();
+		MenuInterface->Host(serverName);
+	}
 }
 
 void UCMainMenu::SetServerList(TArray<FServerData> InServerDatas)
@@ -51,7 +63,7 @@ void UCMainMenu::SetServerList(TArray<FServerData> InServerDatas)
 		UCServerRow* row = CreateWidget<UCServerRow>(this, ServerRowClass);
 		if (row == nullptr) return;
 
-		row->ServerName->SetText(FText::FromString(serverData.HostUserName));
+		row->ServerName->SetText(FText::FromString(serverData.Name));
 		row->HostUser->SetText(FText::FromString(serverData.HostUserName));
 		FString fractionText = FString::Printf(TEXT("%d/%d"), serverData.CurrentPlayers, serverData.MaxPlayers);
 		row->ConnectionFraction->SetText(FText::FromString(fractionText));
@@ -101,6 +113,13 @@ void UCMainMenu::OpenMainMenu()
 	if (MenuSwitcher == nullptr) return;
 	if (MainMenu == nullptr) return;
 	MenuSwitcher->SetActiveWidget(MainMenu);
+}
+
+void UCMainMenu::OpenHostMenu()
+{
+	if (MenuSwitcher == nullptr) return;
+	if (HostMenu == nullptr) return;
+	MenuSwitcher->SetActiveWidget(HostMenu);
 }
 
 void UCMainMenu::UpdateChildren()

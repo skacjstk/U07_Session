@@ -5,7 +5,7 @@
 #include "OnlineSessionSettings.h"
 
 const static FName SESSION_NAME = TEXT("GameSession");	// 북미서버, 아시아서버 같은거라 보면 된다.
-
+const static FName SERVER_NAME_SETTINGS_KEY = TEXT("ServerName");
 UCGameInstance::UCGameInstance(const FObjectInitializer& ObjectInitializer)
 {
 	GLog->Log("GameInstance Construction Called");
@@ -41,6 +41,8 @@ void UCGameInstance::Init()
 	{
 		UE_LOG(LogTemp, Error, TEXT("OSS Not Found"));
 	}
+	GEngine->OnNetworkFailure().AddUObject(this, &UCGameInstance::OnNetworkFailure);
+
 }
 
 void UCGameInstance::LoadMainMenu()
@@ -65,8 +67,9 @@ void UCGameInstance::LoadInGameMenu()
 	inGameMenu->Setup();
 }
 
-void UCGameInstance::Host()
+void UCGameInstance::Host(FString InServerName)
 {
+	DesiredServerName = InServerName;
 	if (SessionInterface.IsValid())
 	{
 		auto existingSession = SessionInterface->GetNamedSession(SESSION_NAME);	// 세션 객체 주소 리턴 
@@ -96,12 +99,25 @@ void UCGameInstance::CreateSession()
 			sessionSettings.bIsLANMatch = false;
 		}
 
-		sessionSettings.NumPublicConnections = 2;	// 인원수 제한
+		sessionSettings.NumPublicConnections = 10;	// 인원수 제한
 		sessionSettings.bShouldAdvertise = true;	
 		sessionSettings.bUsesPresence = true;	// STEAM OSS 이후 사용: LobbySession을 가져오기 위해
+		FString name = "TestValue";
+		sessionSettings.Set(SERVER_NAME_SETTINGS_KEY, DesiredServerName, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 		SessionInterface->CreateSession(0, SESSION_NAME, sessionSettings);
 		// 방장번호, 
 	}
+}
+
+void UCGameInstance::OnNetworkFailure(UWorld* InWorld, UNetDriver* InNewDriver, ENetworkFailure::Type InType, const FString& ErrorString)
+{
+	LoadMainMenuLevel();	// 네트워크 실패시 ClientTravel
+}
+
+void UCGameInstance::StartSession()
+{
+	if (SessionInterface.IsValid())
+		SessionInterface->StartSession(SESSION_NAME);	// 이러면 검색이 안된다.
 }
 
 void UCGameInstance::Join(uint32 Index)
@@ -155,7 +171,7 @@ void UCGameInstance::OnCreateSessionComplete(FName InSessionName, bool InSuccess
 
 	UWorld* world = GetWorld();
 	if (world == nullptr) return;
-	world->ServerTravel("/Game/Maps/Play?listen");
+	world->ServerTravel("/Game/Maps/Lobby?listen");
 }
 
 void UCGameInstance::OnDestroySessionComplete(FName InSessionName, bool InSuccess)
@@ -181,6 +197,15 @@ void UCGameInstance::OnFindSessionsComplete(bool InSuccess)
 			data.MaxPlayers = searchResult.Session.SessionSettings.NumPublicConnections;
 			data.CurrentPlayers = data.MaxPlayers - searchResult.Session.NumOpenPublicConnections;	// 최대 유저수 - 비어있는 슬롯 수
 			data.HostUserName = searchResult.Session.OwningUserName;	// 소유자의 PC 이름
+			
+			FString serverName;
+			if (searchResult.Session.SessionSettings.Get(SERVER_NAME_SETTINGS_KEY, serverName))
+			{
+				data.Name = serverName;
+			}else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Session Not Found"));
+			}		
 			serverDatas.Add(data);
 		}
 		MainMenu->SetServerList(serverDatas);	// 검색 완료된 세션 ID들을 넘겨주기
