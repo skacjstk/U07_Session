@@ -13,8 +13,12 @@ class AFP_FirstPersonGameMode : public AGameModeBase
 
 public:
 	AFP_FirstPersonGameMode();
-
+	virtual void PostLogin(APlayerController* NewPlayer) override;	// 컨트롤러를 뗏다가 붙이는 
+	
+protected:
+	void BeginPlay() override;
 public:
+
 };
 
 

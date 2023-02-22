@@ -29,6 +29,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 		UAnimMontage* FireAnimation;
 
+	UPROPERTY(VisibleDefaultsOnly, Category = Gameplay)
+		class UParticleSystemComponent* FP_GunShotParticle;
+
+	UPROPERTY(VisibleDefaultsOnly, Category = Gameplay)
+		class UParticleSystemComponent* TP_GunShotParticle;
+
 	//TP
 	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
 		USkeletalMeshComponent* TP_Gun;
@@ -58,7 +64,23 @@ public:
 		float WeaponDamage;
 
 protected:
+	void BeginPlay() override;
 	void OnFire();
+
+	// remote procedure call
+	UFUNCTION(Server, Reliable)
+		void OnServerFire(const FVector& LineStart, const FVector& LineEnd);
+	void OnServerFire_Implementation(const FVector& LineStart, const FVector& LineEnd);
+	UFUNCTION(NetMulticast, Unreliable)
+		void MulticastFireEffect();
+	void MulticastFireEffect_Implementation();
+
+public:	// 색 바꾸기
+	UFUNCTION(NetMulticast, Reliable)
+		void SetTeamColor(ETeamType InTeamType);
+	void SetTeamColor_Implementation(ETeamType InTeamType);
+
+protected:
 	void MoveForward(float Val);
 	void MoveRight(float Val);
 	void TurnAtRate(float Rate);
@@ -73,6 +95,12 @@ public:
 	FORCEINLINE class USkeletalMeshComponent* GetMesh1P() const { return FP_Mesh; }
 	FORCEINLINE class UCameraComponent* GetFirstPersonCameraComponent() const { return Camera; }
 
+public:
+	UPROPERTY(Replicated)
+		ETeamType CurrentTeam;
+private:
+	class UMaterialInstanceDynamic* DynamicMaterial;
+	/*
 	UFUNCTION(Reliable, Server)
 		void OnServer();	// 서버 호출
 	UFUNCTION(NetMulticast, Reliable)
@@ -83,5 +111,6 @@ public:
 	int32 RandomValue_NoReplicated;
 	UPROPERTY(Replicated)
 		int32 RandomValue_Replicated;
+	*/
 };
 

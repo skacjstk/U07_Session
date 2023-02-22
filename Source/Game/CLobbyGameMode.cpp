@@ -25,7 +25,7 @@ void ACLobbyGameMode::Logout(AController* Exiting)
 void ACLobbyGameMode::StartGame()
 {
 	UWorld* world = GetWorld();
-	bUseSeamlessTravel = true;
+//	bUseSeamlessTravel = true;
 
 	UCGameInstance* gameInstance = Cast<UCGameInstance>(GetGameInstance());
 	if (gameInstance == nullptr) return;
