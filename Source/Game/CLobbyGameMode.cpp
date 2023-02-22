@@ -30,5 +30,5 @@ void ACLobbyGameMode::StartGame()
 	UCGameInstance* gameInstance = Cast<UCGameInstance>(GetGameInstance());
 	if (gameInstance == nullptr) return;
 	gameInstance->StartSession();
-	world->ServerTravel("/Game/Maps/Play?listen");
+	world->ServerTravel("/Game/Maps/Combat?listen");
 }

@@ -5,6 +5,8 @@
 #include "Camera/CameraComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
+#include "Global.h"
+#include "Net/UnrealNetwork.h"
 
 #define COLLISION_WEAPON		ECC_GameTraceChannel1
 
@@ -101,6 +103,7 @@ void AFP_FirstPersonCharacter::OnFire()
 	{
 		DamagedComponent->AddImpulseAtLocation(ShootDir * WeaponDamage, Impact.Location);
 	}
+	OnServer();
 }
 
 void AFP_FirstPersonCharacter::MoveForward(float Value)
@@ -138,4 +141,51 @@ FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, cons
 	GetWorld()->LineTraceSingleByChannel(Hit, StartTrace, EndTrace, COLLISION_WEAPON, TraceParams);
 
 	return Hit;
+}
+
+void AFP_FirstPersonCharacter::OnServer_Implementation()
+{	
+//	CLog::Print("Only Called OnServer");
+	OnNetMulticast();
+	OnClient();
+	++RandomValue_Replicated;
+
+}
+void AFP_FirstPersonCharacter::OnNetMulticast_Implementation()
+{
+//	CLog::Print("Net Multicast Called");
+	//if (GetLocalRole() == ENetRole::ROLE_Authority)
+	//	CLog::Print("Role_AUthority In NetMulticast", -1, 10.f, FColor::Purple);
+
+	//if (GetLocalRole() == ENetRole::ROLE_AutonomousProxy)
+	//	CLog::Print("ROLE_AutonomousProxy In NetMulticast", -1, 10.f, FColor::Purple);
+
+	//if (GetLocalRole() == ENetRole::ROLE_SimulatedProxy)
+	//	CLog::Print("ROLE_SimulatedProxy In NetMulticast", -1, 10.f, FColor::Purple);
+
+	CLog::Print("No Rep: " + FString::FromInt(RandomValue_NoReplicated));
+	CLog::Print("Rep: " + FString::FromInt(RandomValue_Replicated));
+}
+
+void AFP_FirstPersonCharacter::OnClient_Implementation()
+{
+//	CLog::Print("Client Called");
+
+	//if (GetLocalRole() == ENetRole::ROLE_Authority)
+	//	CLog::Print("Role_AUthority In Client");
+
+	//if (GetLocalRole() == ENetRole::ROLE_AutonomousProxy)
+	//	CLog::Print("ROLE_AutonomousProxy In Client");
+
+	//if (GetLocalRole() == ENetRole::ROLE_SimulatedProxy)
+	//	CLog::Print("ROLE_SimulatedProxy In Client");
+
+	RandomValue_NoReplicated++;
+}
+
+void AFP_FirstPersonCharacter::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const
+{
+	//https://docs.unrealengine.com/4.26/en-US/InteractiveExperiences/Networking/Actors/Properties/
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AFP_FirstPersonCharacter, RandomValue_Replicated);	// 변수 Replicated 등록
 }
