@@ -21,8 +21,8 @@ void ACSpawnPoint::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	OnActorBeginOverlap.AddDynamic(this, &ACSpawnPoint::OnActorBeginOverlap);
-	OnActorBeginOverlap.AddDynamic(this, &ACSpawnPoint::OnActorEndOverlap);
+	OnActorBeginOverlap.AddDynamic(this, &ACSpawnPoint::ActorBeginOverlap);
+	OnActorEndOverlap.AddDynamic(this, &ACSpawnPoint::ActorEndOverlap);
 }
 
 void ACSpawnPoint::Tick(float DeltaTime)
@@ -31,7 +31,7 @@ void ACSpawnPoint::Tick(float DeltaTime)
 	Capsule->UpdateOverlaps();	// 오버랩을 사실상 tick단위로 확인..
 }
 
-void ACSpawnPoint::OnActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor)
+void ACSpawnPoint::ActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor)
 {
 	if (HasAuthority() == false) return;
 	// AddUnique 속에 Find가 있는데 그냥 써봄
@@ -39,9 +39,9 @@ void ACSpawnPoint::OnActorBeginOverlap(AActor* OverlappedActor, AActor* OtherAct
 		OverlappedActors.Add(OtherActor);
 }
 
-void ACSpawnPoint::OnActorEndOverlap(AActor* OverlappedActor, AActor* OtherActor)
+void ACSpawnPoint::ActorEndOverlap(AActor* OverlappedActor, AActor* OtherActor)
 {
 	if (HasAuthority() == false) return;
-	OverlappedActors.Remove(OtherActor);
+		OverlappedActors.Remove(OtherActor);	// 여긴 그냥 조건없이 지워버리면 떨어지지 않음
 }
 

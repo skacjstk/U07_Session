@@ -42,8 +42,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 		UAnimMontage* TP_FireAnimation;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+		UAnimMontage* TP_HitAnimation;
 public:
-	AFP_FirstPersonCharacter();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
 		float BaseTurnRate;
@@ -62,8 +63,13 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 		float WeaponDamage;
+public:
+	AFP_FirstPersonCharacter();
 
+	class ACPlayerState* GetSelfPlayerState();
+	void SetSelfPlayerState(class ACPlayerState* NewPlayerState);	// 서버에서만 접근이 가능해야함
 protected:
+	virtual void PossessedBy(AController* NewController) override;	// PostLogin 보다 먼저 호출된다
 	void BeginPlay() override;
 	void OnFire();
 
@@ -74,6 +80,9 @@ protected:
 	UFUNCTION(NetMulticast, Unreliable)
 		void MulticastFireEffect();
 	void MulticastFireEffect_Implementation();
+private:
+	UFUNCTION()
+		void Respawn();
 
 public:	// 색 바꾸기
 	UFUNCTION(NetMulticast, Reliable)
@@ -86,11 +95,16 @@ protected:
 	void TurnAtRate(float Rate);
 	void LookUpAtRate(float Rate);
 
-	FHitResult WeaponTrace(const FVector& StartTrace, const FVector& EndTrace) const;
-
+	FHitResult WeaponTrace(const FVector& StartTrace, const FVector& EndTrace);
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
 
-
+	UFUNCTION(NetMulticast, Unreliable)
+		void PlayDamage();
+	void PlayDamage_Implementation();
+	UFUNCTION(NetMulticast, Unreliable)
+		void PlayDead();
+	void PlayDead_Implementation();
 public:
 	FORCEINLINE class USkeletalMeshComponent* GetMesh1P() const { return FP_Mesh; }
 	FORCEINLINE class UCameraComponent* GetFirstPersonCameraComponent() const { return Camera; }
@@ -100,6 +114,8 @@ public:
 		ETeamType CurrentTeam;
 private:
 	class UMaterialInstanceDynamic* DynamicMaterial;
+	class ACPlayerState* SelfPlayerState;	// 나 자신의 대한 상태
+
 	/*
 	UFUNCTION(Reliable, Server)
 		void OnServer();	// 서버 호출

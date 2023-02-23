@@ -1,4 +1,5 @@
 #include "FP_FirstPersonCharacter.h"
+#include "FP_FirstPersonGameMode.h"
 #include "Animation/AnimInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -11,6 +12,8 @@
 #include "CBullet.h"
 #include "CGameState.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "GameFramework/PlayerState.h"
+#include "CPlayerState.h"
 
 #define COLLISION_WEAPON		ECC_GameTraceChannel1
 
@@ -27,7 +30,7 @@ void AFP_FirstPersonCharacter::GetLifetimeReplicatedProps(TArray< FLifetimePrope
 AFP_FirstPersonCharacter::AFP_FirstPersonCharacter()
 {
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	BaseTurnRate = 45.f;
 	BaseLookUpRate = 45.f;
 
@@ -49,7 +52,7 @@ AFP_FirstPersonCharacter::AFP_FirstPersonCharacter()
 	FP_Gun->SetupAttachment(FP_Mesh, TEXT("GripPoint"));
 
 	WeaponRange = 5000.0f;
-	WeaponDamage = 500000.0f;
+	WeaponDamage = 50.0f;
 
 	GunOffset = FVector(100.0f, 30.0f, 10.0f);
 
@@ -72,9 +75,35 @@ AFP_FirstPersonCharacter::AFP_FirstPersonCharacter()
 	TP_GunShotParticle->SetOwnerNoSee(true);
 }
 
+ACPlayerState* AFP_FirstPersonCharacter::GetSelfPlayerState()
+{
+	if(SelfPlayerState == nullptr)
+		SelfPlayerState = Cast<ACPlayerState>(GetPlayerState());
+
+	return SelfPlayerState;
+}
+
+void AFP_FirstPersonCharacter::SetSelfPlayerState(ACPlayerState* NewPlayerState)
+{
+	CheckFalse(HasAuthority());
+
+	SetPlayerState(NewPlayerState);
+	SelfPlayerState = Cast<ACPlayerState>(NewPlayerState);
+}
+
+void AFP_FirstPersonCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	SelfPlayerState = Cast<ACPlayerState>(GetPlayerState());
+	if(GetLocalRole() == ENetRole::ROLE_Authority && !!SelfPlayerState)	// Has_Authority() 대신
+		SelfPlayerState->Health = 100.f;
+}
+
 void AFP_FirstPersonCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
 	if(HasAuthority() == false)
 		SetTeamColor(CurrentTeam);	// PostLogin 보다 나중에 호출됨
@@ -95,9 +124,31 @@ void AFP_FirstPersonCharacter::SetupPlayerInputComponent(class UInputComponent* 
 	PlayerInputComponent->BindAxis("LookUpRate", this, &AFP_FirstPersonCharacter::LookUpAtRate);
 }
 
+void AFP_FirstPersonCharacter::PlayDamage_Implementation()
+{
+	if (!!TP_HitAnimation)
+	{
+		UAnimInstance* animInstance = GetMesh()->GetAnimInstance();
+		if (!!animInstance)
+		{
+			animInstance->Montage_Play(TP_HitAnimation, 1.5f);
+		}
+	}
+}
+
+void AFP_FirstPersonCharacter::PlayDead_Implementation()
+{
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionProfileName("Ragdoll");
+	GetMesh()->SetPhysicsBlendWeight(0.5f);	// 렉돌의 정도
+	GetMesh()->SetSimulatePhysics(true);
+}
+
 
 void AFP_FirstPersonCharacter::OnFire()
 {
+	CheckTrue(GetSelfPlayerState()->Health <= 0);	
+
 	if (FireAnimation != NULL)
 	{
 		UAnimInstance* AnimInstance = FP_Mesh->GetAnimInstance();
@@ -107,7 +158,9 @@ void AFP_FirstPersonCharacter::OnFire()
 		}
 	}
 	if (!!FP_GunShotParticle)
+	{
 		FP_GunShotParticle->Activate(true);
+	}
 
 	APlayerController* PlayerController = Cast<APlayerController>(GetController());
 
@@ -117,29 +170,24 @@ void AFP_FirstPersonCharacter::OnFire()
 	if (PlayerController)
 	{
 		FRotator CamRot;
-		PlayerController->GetPlayerViewPoint(StartTrace, CamRot);
-		ShootDir = CamRot.Vector();
+		PlayerController->GetPlayerViewPoint(StartTrace, CamRot);	// out 파라미터
+		ShootDir = CamRot.Vector();	// 유닛벡터:방향
 
-		StartTrace = StartTrace + ShootDir * ((GetActorLocation() - StartTrace) | ShootDir);
+		StartTrace = StartTrace + ShootDir * ((GetActorLocation() - StartTrace) | ShootDir);	// 투영벡터 구하기 vector * 내적한 벡터
 	}
 
 	const FVector EndTrace = StartTrace + ShootDir * WeaponRange;
 
-	const FHitResult Impact = WeaponTrace(StartTrace, EndTrace);
+	
+	UGameplayStatics::ApplyDamage()
 
-	AActor* DamagedActor = Impact.GetActor();
-	UPrimitiveComponent* DamagedComponent = Impact.GetComponent();
-
-	if ((DamagedActor != NULL) && (DamagedActor != this) && (DamagedComponent != NULL) && DamagedComponent->IsSimulatingPhysics())
-	{
-		DamagedComponent->AddImpulseAtLocation(ShootDir * WeaponDamage, Impact.Location);
-	}
 	OnServerFire(StartTrace, EndTrace);
 }
 
 void AFP_FirstPersonCharacter::OnServerFire_Implementation(const FVector& LineStart, const FVector& LineEnd)
 {
-	MulticastFireEffect();
+	const FHitResult Impact = WeaponTrace(LineStart, LineEnd);
+	MulticastFireEffect();	
 }
 
 void AFP_FirstPersonCharacter::MulticastFireEffect_Implementation()
@@ -158,7 +206,9 @@ void AFP_FirstPersonCharacter::MulticastFireEffect_Implementation()
 	}
 
 	if (!!TP_GunShotParticle)
+	{
 		TP_GunShotParticle->Activate(true);
+	}
 
 	GetWorld()->SpawnActor<ACBullet>(ACBullet::StaticClass(), FP_Gun->GetSocketLocation("Muzzle"), GetControlRotation());
 }
@@ -206,17 +256,64 @@ void AFP_FirstPersonCharacter::LookUpAtRate(float Rate)
 	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
 }
 
-FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, const FVector& EndTrace) const
+FHitResult AFP_FirstPersonCharacter::WeaponTrace(const FVector& StartTrace, const FVector& EndTrace)
 {
 	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(WeaponTrace), true, GetInstigator());
 	TraceParams.bReturnPhysicalMaterial = true;
 
 	FHitResult Hit(ForceInit);
 	GetWorld()->LineTraceSingleByChannel(Hit, StartTrace, EndTrace, COLLISION_WEAPON, TraceParams);
+	
+	CheckFalseResult(Hit.IsValidBlockingHit(), Hit);
+	AFP_FirstPersonCharacter* other = Cast<AFP_FirstPersonCharacter>(Hit.GetActor());
+
+	if (other != nullptr && other->GetSelfPlayerState()->Team != GetSelfPlayerState()->Team && other->GetSelfPlayerState()->Health > 0)
+	{
+		FDamageEvent e;
+		other->TakeDamage(WeaponDamage, e, GetController(), this);
+	}
 
 	return Hit;
 }
 
+float AFP_FirstPersonCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	
+	CheckTrueResult(DamageCauser == this, DamageAmount);
+	SelfPlayerState->Health -= DamageAmount;
+
+	if (SelfPlayerState->Health <= 0)
+	{
+		PlayDead();
+		++SelfPlayerState->Death;
+		AFP_FirstPersonCharacter* other = Cast< AFP_FirstPersonCharacter>(DamageCauser);
+		if (!!other)
+			other->SelfPlayerState->Score += 1.f;
+
+		FTimerHandle handle;
+		GetWorldTimerManager().SetTimer(handle, this, &AFP_FirstPersonCharacter::Respawn, 3.f, false);
+
+
+		return DamageAmount;
+	}
+
+	PlayDamage();
+	return DamageAmount;
+
+}
+
+void AFP_FirstPersonCharacter::Respawn()
+{	
+	CheckFalse(HasAuthority());
+	// 서버로써의 게임모드 가져오기
+	SelfPlayerState->Health = 100.f;	// 풀피로 채워놓고 
+	Cast<AFP_FirstPersonGameMode>(GetWorld()->GetAuthGameMode())->Respawn(this);
+			// 컨트롤러를 붙였다가 떼기 위해
+	Destroy(true);
+	// 렉돌은 원복이 안돼 ( MeshComponent 를 다시 해야)
+		
+}
 
 
 

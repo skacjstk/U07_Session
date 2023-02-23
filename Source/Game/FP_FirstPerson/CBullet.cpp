@@ -26,8 +26,8 @@ ACBullet::ACBullet()
 	if (materialAsset.Succeeded())
 		Mesh->SetMaterial(0, materialAsset.Object);
 
-	Projectile->InitialSpeed = 2e+4;
-	Projectile->MaxSpeed = 2e+4;
+	Projectile->InitialSpeed = 1e+4;
+	Projectile->MaxSpeed = 1e+4;
 	Projectile->ProjectileGravityScale = 0.f;
 }
 

@@ -24,9 +24,9 @@ public:
 	FORCEINLINE bool IsBlocked() { return OverlappedActors.Num() > 0; }
 private:
 	UFUNCTION()
-	void OnActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor);
+	void ActorBeginOverlap(AActor* OverlappedActor, AActor* OtherActor);
 	UFUNCTION()
-		void OnActorEndOverlap(AActor* OverlappedActor, AActor* OtherActor);
+		void ActorEndOverlap(AActor* OverlappedActor, AActor* OtherActor);
 protected:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
 		ETeamType Team;
